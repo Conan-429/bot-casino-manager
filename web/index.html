@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Casino Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; max-width: 300px; }
+    pre { background: #f4f4f4; padding: 10px; white-space: pre-wrap; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #eee; }
+  </style>
+</head>
+<body>
+
+  <h1>🎲 Gestione Casinò</h1>
+
+  <h2>Cerca utente</h2>
+  <input id="nome" placeholder="Nome utente" />
+  <button onclick="cerca()">Cerca</button>
+
+  <div id="utente-info" style="display:none; margin-top:20px;">
+    <h3>Dati utente</h3>
+    <div id="dati-utente"></div>
+
+    <h3>Storico cambi fish</h3>
+    <table id="tabella-cambi">
+      <thead>
+        <tr><th>Data/Ora</th><th>Fish cambiati</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Registra nuovo cambio fish</h3>
+    <input type="number" id="fish" placeholder="Quantità fish cambiati" min="1" />
+    <input type="datetime-local" id="data_ora" />
+    <button onclick="registraCambio()">Registra cambio</button>
+
+    <p id="msg-cambio" style="color:green;"></p>
+  </div>
+
+  <script>
+    async function cerca() {
+      const nome = document.getElementById('nome').value.trim();
+      if (!nome) return alert('Inserisci un nome utente');
+
+      try {
+        const res = await fetch(`http://localhost:3001/utenti/${encodeURIComponent(nome)}`);
+        if (!res.ok) {
+          document.getElementById('utente-info').style.display = 'none';
+          throw new Error(`Utente non trovato: ${res.status}`);
+        }
+        const data = await res.json();
+
+        document.getElementById('utente-info').style.display = 'block';
+
+        // Dati utente
+        const utente = data.utente;
+        document.getElementById('dati-utente').innerHTML = `
+          <p><b>Nome:</b> ${utente.nome}</p>
+          <p><b>Pass:</b> ${utente.pass}</p>
+          <p><b>Fish massimi:</b> ${utente.fish_max}</p>
+          <p><b>Fish residui:</b> ${utente.fish_residui}</p>
+          <p><b>Ultimo reset:</b> ${utente.ultima_reset}</p>
+        `;
+
+        // Storico cambi
+        const cambi = data.cambi;
+        const tbody = document.querySelector('#tabella-cambi tbody');
+        tbody.innerHTML = '';
+        if (cambi.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="2">Nessun cambio registrato</td></tr>';
+        } else {
+          for (const cambio of cambi) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${cambio.data_ora}</td><td>${cambio.fish_cambiati}</td>`;
+            tbody.appendChild(tr);
+          }
+        }
+
+        // Imposta data_ora input a ora corrente
+        const now = new Date();
+        const isoString = now.toISOString().slice(0,16); // YYYY-MM-DDTHH:mm
+        document.getElementById('data_ora').value = isoString;
+
+        // Pulisci messaggio cambio
+        document.getElementById('msg-cambio').textContent = '';
+
+      } catch (err) {
+        alert('Errore: ' + err.message);
+      }
+    }
+
+    async function registraCambio() {
+      const nome = document.getElementById('nome').value.trim();
+      const fish_cambiati = parseInt(document.getElementById('fish').value, 10);
+      const data_ora = document.getElementById('data_ora').value;
+
+      if (!nome) return alert('Inserisci un nome utente');
+      if (!fish_cambiati || fish_cambiati <= 0) return alert('Inserisci una quantità valida di fish');
+      if (!data_ora) return alert('Inserisci data e ora del cambio');
+
+      try {
+        const res = await fetch('http://localhost:3001/cambio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, data_ora, fish_cambiati })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('msg-cambio').style.color = 'green';
+          document.getElementById('msg-cambio').textContent = data.message;
+          // Ricarica i dati utente e storico dopo cambio
+          cerca();
+          // Pulisce input fish
+          document.getElementById('fish').value = '';
+        } else {
+          document.getElementById('msg-cambio').style.color = 'red';
+          document.getElementById('msg-cambio').textContent = data.error || 'Errore salvando cambio fish.';
+        }
+      } catch (err) {
+        document.getElementById('msg-cambio').style.color = 'red';
+        document.getElementById('msg-cambio').textContent = 'Errore di rete o server.';
+      }
+    }
+  </script>
+
+</body>
+</html>

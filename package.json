@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "discord.js": "^14.21.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "node-cron": "^4.1.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "name": "casino-manager",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "bot": "node bot/index.js",
+    "web": "node web/web.js",
+    "dev": "concurrently \"node bot/index.js\" \"node web/web.js\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

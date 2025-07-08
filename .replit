@@ -1,0 +1,19 @@
+run = "node server.js"
+entrypoint = "server.js"
+language = "nodejs"
+
+[env]
+PORT = "3000"
+DOTENV_CONFIG_PATH = ".env"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+hidden = [".config", "package-lock.json"]
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", "package.json", "package-lock.json"]
+
+[nix]
+channel = "stable-24_11"

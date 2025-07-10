@@ -287,6 +287,80 @@ client.on('interactionCreate', async interaction => {
       }
     }
     else if (interaction.customId === 'annulla_reset_all') {
+          }
+    // GESTORI PER CAMBIO FISH
+    else if (interaction.customId.startsWith('conferma_cambio_fish_')) {
+      const [nome, quantita] = interaction.customId.replace('conferma_cambio_fish_', '').split('_');
+      const quantitaNum = parseInt(quantita);
+      const data_ora = dayjs().tz(TZ).format();
+
+      try {
+        // Verifica che l'utente esista ancora
+        const utente = await get(
+          "SELECT nome, fish_residui FROM utenti WHERE nome = ?",
+          [nome]
+        );
+        
+        if (!utente) {
+          await interaction.update({
+            content: `❌ **Errore!**\n\nL'utente **${nome}** non è più presente nel database.`,
+            components: []
+          });
+          return;
+        }
+
+        // Verifica che ci siano ancora abbastanza fish
+        if (utente.fish_residui < quantitaNum) {
+          await interaction.update({
+            content: `❌ **Fish insufficienti!**\n\nL'utente **${nome}** non ha abbastanza fish.\n• Fish residui: **${utente.fish_residui}**\n• Fish richiesti: **${quantitaNum}**`,
+            components: []
+          });
+          return;
+        }
+
+        // Aggiorna le fish residue dell'utente
+        await runQuery(
+          "UPDATE utenti SET fish_residui = fish_residui - ? WHERE nome = ?",
+          [quantitaNum, nome]
+        );
+
+        // Registra il cambio nella tabella cambi
+        await runQuery(
+          "INSERT INTO cambi (nome, data_ora, fish_cambiati) VALUES (?, ?, ?)",
+          [nome, data_ora, quantitaNum]
+        );
+
+        // Ottieni le fish residue aggiornate
+        const utenteAggiornato = await get(
+          "SELECT fish_residui FROM utenti WHERE nome = ?",
+          [nome]
+        );
+
+        await interaction.update({
+          content: `✅ **Cambio fish confermato!**\n\nCambio registrato per **${nome}**:\n• Fish cambiate: **${quantitaNum}**\n• Fish residue: **${utenteAggiornato.fish_residui}**`,
+          components: []
+        });
+
+        // Aggiorna la dashboard
+        await inviaDashboard(client);
+
+      } catch (error) {
+        console.error('Errore durante il cambio fish:', error);
+        await interaction.update({
+          content: `❌ **Errore durante il cambio fish!**\n\nSi è verificato un errore durante il cambio fish per l'utente **${nome}**.`,
+          components: []
+        });
+      }
+    }
+    else if (interaction.customId.startsWith('annulla_cambio_fish_')) {
+      const nome = interaction.customId.replace('annulla_cambio_fish_', '').split('_')[0];
+
+      await interaction.update({
+        content: `✅ **Operazione annullata**\n\nIl cambio fish per l'utente **${nome}** è stato annullato. Nessuna modifica è stata apportata al database.`,
+        components: []
+      });
+    }
+    else if (interaction.customId === 'annulla_reset_all') {
       await interaction.update({
         content: `✅ **Operazione annullata**\n\nIl reset globale delle fish è stato annullato. Nessuna modifica è stata apportata al database.`,
         components: []
@@ -325,7 +399,7 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === "reset_all") {
       await interaction.deferReply();
 
-      // Aggiungiamo la richiesta di conferma
+      // Richiesta di conferma
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -361,7 +435,7 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
-      // Aggiungiamo la richiesta di conferma
+      // Richiesta di conferma
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -392,7 +466,7 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
-      // Aggiungiamo la richiesta di conferma
+      // Richiesta di conferma
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -529,12 +603,11 @@ client.on('interactionCreate', async interaction => {
       await interaction.deferReply();
       const nome = interaction.options.getString("nome");
       const quantita = interaction.options.getInteger("quantita");
-      const data_ora = interaction.options.getString("data_ora") || dayjs().tz(TZ).format();
 
       // Verifica che l'utente esista
       const utente = await get(
         "SELECT nome, fish_residui FROM utenti WHERE nome = ?",
-        [nome],
+        [nome]
       );
       if (!utente) {
         await interaction.editReply(`⚠️ Utente **${nome}** non trovato.`);
@@ -549,35 +622,23 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
-      try {
-        // Aggiorna le fish residue dell'utente
-        await runQuery(
-          "UPDATE utenti SET fish_residui = fish_residui - ? WHERE nome = ?",
-          [quantita, nome]
+      // Aggiungiamo la richiesta di conferma
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`conferma_cambio_fish_${nome}_${quantita}`)
+            .setLabel('✅ Conferma Cambio Fish')
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(`annulla_cambio_fish_${nome}_${quantita}`)
+            .setLabel('❌ Annulla')
+            .setStyle(ButtonStyle.Secondary)
         );
 
-        // Registra il cambio nella tabella cambi
-        await runQuery(
-          "INSERT INTO cambi (nome, data_ora, fish_cambiati) VALUES (?, ?, ?)",
-          [nome, data_ora, quantita]
-        );
-
-        // Ottieni le fish residue aggiornate
-        const utenteAggiornato = await get(
-          "SELECT fish_residui FROM utenti WHERE nome = ?",
-          [nome]
-        );
-
-        await interaction.editReply(
-          `✅ Cambio fish registrato per **${nome}**!\n• Fish cambiate: **${quantita}**\n• Fish residue: **${utenteAggiornato.fish_residui}**`
-        );
-
-        // Aggiorna la dashboard
-        await inviaDashboard(client);
-      } catch (error) {
-        console.error('Errore durante il cambio fish:', error);
-        await interaction.editReply(`❌ Errore durante il cambio fish per l'utente **${nome}**.`);
-      }
+      await interaction.editReply({
+        content: `⚠️ **CONFERMA CAMBIO FISH**\n\nStai per registrare un cambio fish per **${nome}**:\n\n• **Fish da cambiare:** ${quantita}\n• **Fish residue attuali:** ${utente.fish_residui}\n• **Fish residue dopo il cambio:** ${utente.fish_residui - quantita}\n\nSei sicuro di voler procedere?`,
+        components: [row]
+      });
     } else if (commandName === "storico_utente") {
       await interaction.deferReply();
       const nome = interaction.options.getString("nome");
